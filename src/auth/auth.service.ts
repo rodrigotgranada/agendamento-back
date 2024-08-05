@@ -1,7 +1,7 @@
 import { Injectable, UnauthorizedException, ConflictException, InternalServerErrorException, NotFoundException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UserService } from '../user/user.service';
-import { IUser } from '../user/user.interface'; // Importar a interface correta
+import { IUser } from '../user/user.interface'; 
 import * as bcrypt from 'bcrypt';
 import { ConfigService } from '@nestjs/config';
 import { TwilioService } from '../twilio/twilio.service';
@@ -10,7 +10,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { CodeRegister, CodeRegisterDocument } from '../code-register/code-register.schema';
 import { ResetCode, ResetCodeDocument } from '../reset-code/reset-code.schema';
-import { UserDocument } from '../user/user.schema'; // Importar o tipo correto
+import { UserDocument } from '../user/user.schema'; 
 
 @Injectable()
 export class AuthService {
@@ -134,18 +134,6 @@ export class AuthService {
     this.logger.log(`User activated successfully: ${email}`);
     return this.userService.toIUser(userDocument);
   }
-
-
-  async verifyActivationCode(code: string): Promise<boolean> {
-    try {
-      // Verify the activation code from the database (not shown here)
-      return true; // Assume always valid for example purposes
-    } catch (error) {
-      this.logger.error('Failed to verify activation code', error);
-      throw new InternalServerErrorException('Failed to verify activation code');
-    }
-  }
-
 
   async regenerateActivationCode(email: string): Promise<{ message: string }> {
     const user = await this.userService.findByEmail(email);
