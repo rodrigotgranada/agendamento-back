@@ -1,11 +1,11 @@
 import { MiddlewareConsumer, Module, RequestMethod } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
+import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
-import { TwilioModule } from './twilio/twilio.module';
 import { CodeRegisterModule } from './code-register/code-register.module';
 import { EmailModule } from './email/email.module';
+import { TwilioModule } from './twilio/twilio.module';
 import { LogRequestMiddleware } from './common/middleware/log-request.middleware';
 
 @Module({
@@ -13,12 +13,12 @@ import { LogRequestMiddleware } from './common/middleware/log-request.middleware
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    MongooseModule.forRoot('mongodb://127.0.0.1:27017/sports-scheduling'),
+    MongooseModule.forRoot(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/sports-scheduling'),
     AuthModule,
     UserModule,
-    TwilioModule,
     CodeRegisterModule,
     EmailModule,
+    TwilioModule,
   ],
 })
 export class AppModule {
