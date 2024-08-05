@@ -6,8 +6,7 @@ export class LogRequestMiddleware implements NestMiddleware {
   private readonly logger = new Logger(LogRequestMiddleware.name);
 
   use(req: Request, res: Response, next: NextFunction) {
-    this.logger.log(`Request user: ${JSON.stringify(req.user)}`);
-    console.log(`Request user: ${JSON.stringify(req.user)}`);
+    this.logger.log(`Incoming request: ${req.method} ${req.url}`);
     next();
   }
 }
