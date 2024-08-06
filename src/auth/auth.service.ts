@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, ConflictException, InternalServerErrorException, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, InternalServerErrorException, NotFoundException, Logger, Inject, forwardRef } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UserService } from '../user/user.service';
 import { IUser } from '../user/user.interface'; 
@@ -17,7 +17,7 @@ export class AuthService {
   private readonly logger = new Logger(AuthService.name);
 
   constructor(
-    private userService: UserService,
+    @Inject(forwardRef(() => UserService)) private userService: UserService,
     private jwtService: JwtService,
     private configService: ConfigService,
     private twilioService: TwilioService,
@@ -74,26 +74,10 @@ export class AuthService {
       }
 
       createUserDto.role = 'user'; // Definir o role como 'user' por padrão
-      const user = await this.userService.createUser(createUserDto) as unknown as UserDocument; // Forçar o tipo para UserDocument
+      const user = await this.userService.createUser(createUserDto);
 
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
-      const codeRegister = new this.codeRegisterModel({ userId: user._id, code });
-      await codeRegister.save();
-
-      this.logger.log(`Activation code generated: ${code}`);
-
-      try {
-        await this.twilioService.sendSms(user.phone, `Your activation code is ${code}`);
-        this.logger.log(`SMS sent to: ${user.phone}`);
-      } catch (error) {
-        this.logger.error('Failed to send SMS', error.message);
-      }
-
-      try {
-        await this.emailService.sendVerificationEmail(user.email, code);
-        this.logger.log(`Email sent to: ${user.email}`);
-      } catch (error) {
-        this.logger.error('Failed to send email', error.message);
+      if (user.active === 'pending') {
+        await this.sendActivationCode(user as UserDocument);
       }
 
       return this.userService.toIUser(user);
@@ -101,6 +85,29 @@ export class AuthService {
       this.logger.error('Failed to register user', error);
       throw new InternalServerErrorException('Failed to register user');
     }
+  }
+
+  async sendActivationCode(user: UserDocument): Promise<void> {
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const codeRegister = new this.codeRegisterModel({ userId: user._id, code });
+    await codeRegister.save();
+
+    this.logger.log(`Activation code generated: ${code}`);
+
+    try {
+      await this.twilioService.sendSms(user.phone, `Your activation code is ${code}`);
+      this.logger.log(`SMS sent to: ${user.phone}`);
+    } catch (error) {
+      this.logger.error('Failed to send SMS', error.message);
+    }
+
+    // Comentado conforme solicitado
+    // try {
+    //   await this.emailService.sendVerificationEmail(user.email, code);
+    //   this.logger.log(`Email sent to: ${user.email}`);
+    // } catch (error) {
+    //   this.logger.error('Failed to send email', error.message);
+    // }
   }
 
   async activateUser(email: string, code: string): Promise<IUser> {
@@ -150,28 +157,9 @@ export class AuthService {
     // Excluir códigos de ativação anteriores, se existirem
     await this.codeRegisterModel.deleteMany({ userId: user._id }).exec();
 
-    // Gerar novo código de ativação
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    const codeRegister = new this.codeRegisterModel({ userId: user._id, code });
-    await codeRegister.save();
+    await this.sendActivationCode(user as UserDocument);
 
-    this.logger.log(`New activation code generated: ${code}`);
-
-    try {
-      await this.twilioService.sendSms(user.phone, `Your new activation code is ${code}`);
-      this.logger.log(`SMS sent to: ${user.phone}`);
-    } catch (error) {
-      this.logger.error('Failed to send SMS', error.message);
-    }
-
-    try {
-      await this.emailService.sendVerificationEmail(user.email, code);
-      this.logger.log(`Email sent to: ${user.email}`);
-    } catch (error) {
-      this.logger.error('Failed to send email', error.message);
-    }
-
-    return { message: 'A new activation code has been generated and sent to your email and phone' };
+    return { message: 'A new activation code has been generated and sent to your phone' };
   }
 
   async forgotPassword(email: string): Promise<{ message: string }> {
@@ -198,14 +186,15 @@ export class AuthService {
       this.logger.error('Failed to send SMS', error.message);
     }
 
-    try {
-      await this.emailService.sendVerificationEmail(user.email, resetCode);
-      this.logger.log(`Email sent to: ${user.email}`);
-    } catch (error) {
-      this.logger.error('Failed to send email', error.message);
-    }
+    // Comentado conforme solicitado
+    // try {
+    //   await this.emailService.sendVerificationEmail(user.email, resetCode);
+    //   this.logger.log(`Email sent to: ${user.email}`);
+    // } catch (error) {
+    //   this.logger.error('Failed to send email', error.message);
+    // }
 
-    return { message: 'A password reset code has been sent to your email and phone' };
+    return { message: 'A password reset code has been sent to your phone' };
   }
 
   async verifyResetCode(email: string, code: string): Promise<{ message: string }> {

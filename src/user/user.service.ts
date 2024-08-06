@@ -1,31 +1,36 @@
-import { Injectable, NotFoundException, InternalServerErrorException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, InternalServerErrorException, Logger, Inject, forwardRef } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User, UserDocument } from './user.schema';
 import { CreateUserDto, UpdateUserDto } from './user.dto';
 import { IUser } from './user.interface';
 import * as bcrypt from 'bcrypt';
+import { AuthService } from '../auth/auth.service';
 
 @Injectable()
 export class UserService {
   private readonly logger = new Logger(UserService.name);
 
-  constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) {}
+  constructor(
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @Inject(forwardRef(() => AuthService)) private authService: AuthService
+  ) {}
 
-  async createUser(createUserDto: CreateUserDto): Promise<IUser> {
+  async createUser(createUserDto: CreateUserDto): Promise<UserDocument> {
     try {
       const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
+      const activeStatus = createUserDto.active ?? 'pending'; // Define active como 'pending' se não for fornecido
+
       const newUser = new this.userModel({
         ...createUserDto,
         password: hashedPassword,
-        active: 'pending',
+        active: activeStatus,
       });
 
       newUser.createdBy = newUser._id.toString();
       newUser.updatedBy = newUser._id.toString();
 
-      const createdUser = await newUser.save();
-      return this.toIUser(createdUser);
+      return await newUser.save();
     } catch (error) {
       this.logger.error('Failed to create user', error);
       throw new InternalServerErrorException('Failed to create user');
