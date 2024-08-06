@@ -1,7 +1,7 @@
 import { Injectable, UnauthorizedException, ConflictException, InternalServerErrorException, NotFoundException, Logger, Inject, forwardRef } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UserService } from '../user/user.service';
-import { IUser } from '../user/user.interface'; 
+import { IUser } from '../user/user.interface';
 import * as bcrypt from 'bcrypt';
 import { ConfigService } from '@nestjs/config';
 import { TwilioService } from '../twilio/twilio.service';
@@ -10,7 +10,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { CodeRegister, CodeRegisterDocument } from '../code-register/code-register.schema';
 import { ResetCode, ResetCodeDocument } from '../reset-code/reset-code.schema';
-import { UserDocument } from '../user/user.schema'; 
+import { UserDocument } from '../user/user.schema';
 
 @Injectable()
 export class AuthService {
@@ -55,25 +55,22 @@ export class AuthService {
     const { email, phone, cpf } = createUserDto;
 
     try {
-      // Verificar se o email já existe
       const emailExists = await this.userService.findByEmail(email);
       if (emailExists) {
         throw new ConflictException('Email already exists');
       }
 
-      // Verificar se o phone já existe
       const phoneExists = await this.userService.findByPhone(phone);
       if (phoneExists) {
         throw new ConflictException('Phone already exists');
       }
 
-      // Verificar se o cpf já existe
       const cpfExists = await this.userService.findByCpf(cpf);
       if (cpfExists) {
         throw new ConflictException('CPF already exists');
       }
 
-      createUserDto.role = 'user'; // Definir o role como 'user' por padrão
+      createUserDto.role = 'user';
       const user = await this.userService.createUser(createUserDto);
 
       if (user.active === 'pending') {
@@ -83,8 +80,18 @@ export class AuthService {
       return this.userService.toIUser(user);
     } catch (error) {
       this.logger.error('Failed to register user', error);
-      throw new InternalServerErrorException('Failed to register user');
+      throw error; // Permitir que o controlador capture o erro específico
     }
+  }
+
+  async updateUserPhoto(userId: string, photoPath: string): Promise<IUser> {
+    const userDocument = await this.userService.findUserDocumentById(userId);
+    if (!userDocument) {
+      throw new NotFoundException('User not found');
+    }
+    userDocument.photo = photoPath;
+    await userDocument.save();
+    return this.userService.toIUser(userDocument);
   }
 
   async sendActivationCode(user: UserDocument): Promise<void> {

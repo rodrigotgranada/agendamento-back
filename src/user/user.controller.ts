@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Delete, Put, UseGuards, Logger, Req, ForbiddenException, Patch } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete, Put, UseGuards, Logger, Req, ForbiddenException, Patch, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { Request } from 'express';
 import { UserService } from './user.service';
 import { AuthService } from '../auth/auth.service';
@@ -7,6 +7,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { GetUser } from '../common/decorators/user.decorator';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 @Controller('users')
 export class UserController {
@@ -86,5 +87,17 @@ export class UserController {
   @Patch(':id/unblock')
   async unblockUser(@Param('id') id: string) {
     return this.userService.blockUser(id, false);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('user', 'admin', 'owner')
+  @Patch(':id/photo')
+  @UseInterceptors(FileInterceptor('photo'))
+  async uploadPhoto(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File // Usando Express.Multer.File aqui
+  ) {
+    const filePath = `/uploads/${id}/profile.jpg`;
+    return await this.userService.updateUserPhoto(id, filePath);
   }
 }

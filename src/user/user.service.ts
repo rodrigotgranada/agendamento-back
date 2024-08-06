@@ -6,6 +6,8 @@ import { CreateUserDto, UpdateUserDto } from './user.dto';
 import { IUser } from './user.interface';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from '../auth/auth.service';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Injectable()
 export class UserService {
@@ -20,22 +22,23 @@ export class UserService {
     try {
       const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
       const activeStatus = createUserDto.active ?? 'pending'; // Define active como 'pending' se não for fornecido
-
+  
       const newUser = new this.userModel({
         ...createUserDto,
         password: hashedPassword,
         active: activeStatus,
       });
-
+  
       newUser.createdBy = newUser._id.toString();
       newUser.updatedBy = newUser._id.toString();
-
+  
       return await newUser.save();
     } catch (error) {
       this.logger.error('Failed to create user', error);
       throw new InternalServerErrorException('Failed to create user');
     }
   }
+  
 
   async findAll(): Promise<IUser[]> {
     try {
@@ -144,6 +147,24 @@ export class UserService {
     } catch (error) {
       this.logger.error('Failed to find user by CPF', error);
       throw new InternalServerErrorException('Failed to find user by CPF');
+    }
+  }
+
+  async updateUserPhoto(userId: string, filePath: string): Promise<IUser> {
+    try {
+      const user = await this.userModel.findById(userId).exec();
+      if (!user) {
+        throw new NotFoundException(`User with ID ${userId} not found`);
+      }
+      user.photo = filePath;
+      user.updatedAt = new Date();
+      user.updatedBy = userId;
+
+      const updatedUser = await user.save();
+      return this.toIUser(updatedUser);
+    } catch (error) {
+      this.logger.error(`Failed to update user photo for ID: ${userId}`, error);
+      throw new InternalServerErrorException('Failed to update user photo');
     }
   }
 
