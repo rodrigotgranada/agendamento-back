@@ -33,8 +33,8 @@ export class CreateUserDto {
   role: string;
 
   @IsOptional()
-  @IsBoolean()
-  active: boolean;
+  @IsString()
+  active: string;  // Atualizado para string
 
   @IsOptional()
   @IsString()

@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Body, Param, Delete, Put, Patch, UseGuards, Logger, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete, Put, UseGuards, Logger, Req, ForbiddenException, Patch } from '@nestjs/common';
 import { Request } from 'express';
 import { UserService } from './user.service';
+import { AuthService } from '../auth/auth.service';
 import { CreateUserDto, UpdateUserDto } from './user.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -11,13 +12,27 @@ import { GetUser } from '../common/decorators/user.decorator';
 export class UserController {
   private readonly logger = new Logger(UserController.name);
 
-  constructor(private readonly userService: UserService) {}
+  constructor(
+    private readonly userService: UserService,
+    private readonly authService: AuthService
+  ) {}
 
-  @Post()
-  async create(@Body() createUserDto: CreateUserDto) {
-    return this.userService.createUser(createUserDto);
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'owner')
+  @Post('admin/create')
+  async createUserByAdmin(@GetUser() user: any, @Body() createUserDto: CreateUserDto) {
+    if (user.role === 'admin' && createUserDto.role !== 'user') {
+      throw new ForbiddenException('Admins can only create users with role "user"');
+    }
+    const createdUser = await this.userService.createUser(createUserDto);
+    if (createUserDto.active === 'pending') {
+      await this.authService.sendActivationCode(createdUser);
+    }
+    return createdUser;
   }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'owner')
   @Get()
   async findAll() {
     return this.userService.findAll();
@@ -25,46 +40,51 @@ export class UserController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  async getProfile(@GetUser() user: { userId: string }) {
-    const userId = user.userId;
-    this.logger.log(`User ID from token: ${userId}`);
-    return this.userService.findOne(userId);
+  async getProfile(@GetUser() user: any) {
+    return this.userService.findOne(user.userId);
   }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'owner')
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return this.userService.findOne(id);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Put('me')
+  async updateProfile(@GetUser() user: any, @Body() updateUserDto: UpdateUserDto) {
+    return this.userService.updateUser(user.userId, updateUserDto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'owner')
   @Put(':id')
-  async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
+  async updateUserByAdmin(@Param('id') id: string, @GetUser() user: any, @Body() updateUserDto: UpdateUserDto) {
+    if (user.role === 'admin' && updateUserDto.role && updateUserDto.role !== 'user') {
+      throw new ForbiddenException('Admins can only update users to role "user"');
+    }
     return this.userService.updateUser(id, updateUserDto);
   }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'owner')
   @Delete(':id')
   async remove(@Param('id') id: string) {
     return this.userService.deleteUser(id);
   }
 
-  // Admin routes
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'owner')
   @Patch(':id/block')
   async blockUser(@Param('id') id: string) {
     return this.userService.blockUser(id, true);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'owner')
   @Patch(':id/unblock')
   async unblockUser(@Param('id') id: string) {
     return this.userService.blockUser(id, false);
-  }
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin')
-  @Put(':id/admin')
-  async updateUserAsAdmin(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    return this.userService.updateUser(id, updateUserDto);
   }
 }
