@@ -1,81 +1,91 @@
 import { Injectable } from '@nestjs/common';
+import * as admin from 'firebase-admin';
+import { User, CreateUserDto } from '@/types/users';
 import { FirebaseAdmin } from './firebase.config';
-import { User } from '@/types/users';
-
-interface FirestoreUserData {
-  cpf: string;
-  createdAt: Date;
-  createdBy: string;
-  email: string;
-  lastName: string;
-  name: string;
-  password: string;
-  phone: string;
-  photoUrl: string | null;
-  role: string;
-  status: 'active' | 'inactive';
-  updatedAt: Date;
-  updatedBy: string;
-}
-
-interface FirestoreDocument {
-  id: string;
-  data: () => FirestoreUserData;
-  exists: boolean;
-}
-
-interface FirestoreCollection {
-  doc: (id: string) => FirestoreDocument;
-  get: () => Promise<FirestoreDocument[]>;
-}
-
-export interface Firestore {
-  collection: (name: string) => FirestoreCollection;
-}
+import { Firestore, FirestoreUserData } from './firebase.interface';
 
 @Injectable()
 export class FirebaseService {
-  private firestore: Firestore;
+  private readonly firestore: Firestore;
 
   constructor() {
     FirebaseAdmin.initialize();
-    this.firestore = FirebaseAdmin.getFirestore() as unknown as Firestore;
+    this.firestore = FirebaseAdmin.getFirestore();
+  }
+
+  async createUser(userData: CreateUserDto): Promise<User> {
+    const { email, name, lastName } = userData;
+
+    const userDoc: Omit<User, 'id' | 'createdAt' | 'updatedAt'> = {
+      email,
+      name,
+      lastName,
+      password: userData.password || '',
+      cpf: userData.cpf || '',
+      createdBy: userData.createdBy || '',
+      phone: userData.phone || '',
+      photoUrl: userData.photoUrl || '',
+      role: userData.role || 'user',
+      status: userData.status || 'active',
+      updatedBy: userData.updatedBy || '',
+    };
+
+    const userRef = this.firestore.collection('users').doc();
+    await userRef.set({
+      ...userDoc,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return {
+      id: userRef.id,
+      ...userDoc,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+  }
+
+  async listAllUsers(): Promise<User[]> {
+    const usersSnapshot = await this.firestore.collection('users').get();
+    const users: User[] = [];
+
+    usersSnapshot.forEach((doc) => {
+      const data = doc.data() as User;
+      users.push({
+        ...data,
+        id: doc.id,
+      });
+    });
+
+    return users;
+  }
+
+  async updateUser(
+    userId: string,
+    userData: Partial<Omit<User, 'createdAt' | 'updatedAt'>>,
+  ): Promise<User> {
+    const userRef = this.firestore.collection('users').doc(userId);
+    const userDoc = await userRef.get();
+
+    if (!userDoc.exists) {
+      throw new Error('Usuário não encontrado');
+    }
+
+    const updateData: Partial<FirestoreUserData> = {
+      ...userData,
+      updatedAt: admin.firestore.Timestamp.now(),
+    };
+
+    await userRef.update(updateData);
+
+    const updatedUser = await userRef.get();
+    return {
+      id: userId,
+      ...(updatedUser.data() as User),
+    };
   }
 
   getFirestore(): Firestore {
     return this.firestore;
-  }
-
-  async listAllUsers(): Promise<User[]> {
-    try {
-      const usersSnapshot = await this.firestore.collection('users').get();
-      const users: User[] = [];
-
-      usersSnapshot.forEach((doc) => {
-        const data = doc.data();
-        const user: User = {
-          id: doc.id,
-          cpf: data.cpf,
-          createdAt: data.createdAt,
-          createdBy: data.createdBy,
-          email: data.email,
-          lastName: data.lastName,
-          name: data.name,
-          password: data.password,
-          phone: data.phone,
-          photoUrl: data.photoUrl,
-          role: data.role,
-          status: data.status,
-          updatedAt: data.updatedAt,
-          updatedBy: data.updatedBy,
-        };
-        users.push(user);
-      });
-
-      return users;
-    } catch (error) {
-      console.error('Erro ao listar usuários:', error);
-      throw new Error('Erro ao listar usuários');
-    }
   }
 }

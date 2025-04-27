@@ -2,7 +2,7 @@ import * as admin from 'firebase-admin';
 import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
-import { Firestore } from './firebase.service';
+import { Firestore } from './firebase.interface';
 
 dotenv.config();
 
