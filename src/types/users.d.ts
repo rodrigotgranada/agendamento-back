@@ -18,9 +18,13 @@ export interface User {
 export interface CreateUserDto {
   email: string;
   password: string;
-  displayName: string;
-  cpf: string;
-  phone: string;
-  lastName: string;
   name: string;
+  lastName: string;
+  cpf?: string;
+  phone?: string;
+  photoUrl?: string | null;
+  role?: string;
+  status?: 'active' | 'inactive';
+  createdBy?: string;
+  updatedBy?: string;
 }
