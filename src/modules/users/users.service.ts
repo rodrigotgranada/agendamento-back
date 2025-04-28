@@ -1,8 +1,9 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { ServicesService } from '@/shared/services/services.service';
 import { CreateUserDto } from './dto/create-user.dto';
-import { User } from '@/types/users';
+import { User, UserStatus } from '@/types/users';
 import { StorageService } from '@/shared/services/firebase/storage.service';
+import * as bcrypt from 'bcrypt';
 
 interface MulterFile {
   buffer: Buffer;
@@ -47,14 +48,32 @@ export class UsersService {
   async createUser(
     createUserDto: CreateUserDto,
     file?: MulterFile,
-  ): Promise<User> {
+  ): Promise<{
+    statusCode: number;
+    success: boolean;
+    message: string;
+    error: null;
+    data: User;
+  }> {
     const { exists, message } = await this.checkUserExists(createUserDto);
     if (exists) {
       throw new BadRequestException(message);
     }
 
+    // Criptografa a senha antes de enviar para o serviço
+    const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
+    const userDataWithHashedPassword = {
+      ...createUserDto,
+      password: hashedPassword,
+      status: UserStatus.PENDING,
+    };
+
     // Primeiro cria o usuário sem foto
-    const user = await this.servicesService.createUser(createUserDto);
+    const user = await this.servicesService.createUser(
+      userDataWithHashedPassword,
+    );
+
+    let updatedUser: User;
 
     // Se houver arquivo, faz o upload e atualiza o usuário
     if (file) {
@@ -66,18 +85,26 @@ export class UsersService {
       );
 
       // Atualiza o usuário com a URL da foto e o createdBy
-      return this.servicesService.updateUser(user.id, {
+      updatedUser = await this.servicesService.updateUser(user.id, {
         photoUrl,
+        createdBy: user.id,
+        updatedBy: user.id,
+      });
+    } else {
+      // Se não houver arquivo, apenas atualiza o createdBy
+      updatedUser = await this.servicesService.updateUser(user.id, {
         createdBy: user.id,
         updatedBy: user.id,
       });
     }
 
-    // Se não houver arquivo, apenas atualiza o createdBy
-    return this.servicesService.updateUser(user.id, {
-      createdBy: user.id,
-      updatedBy: user.id,
-    });
+    return {
+      statusCode: 201,
+      success: true,
+      message: 'Usuário criado com sucesso',
+      error: null,
+      data: updatedUser,
+    };
   }
 
   async listAllUsers(): Promise<User[]> {
@@ -85,9 +112,11 @@ export class UsersService {
   }
 
   async findUserById(userId: string): Promise<User> {
+    console.log('SERVICE - FIND USER BY ID:', userId);
     const users = await this.servicesService.listAllUsers();
     const user = users.find((u) => u.id === userId);
     if (!user) {
+      console.log('SERVICE - USER NOT FOUND');
       throw new BadRequestException('Usuário não encontrado');
     }
     return user;
@@ -141,5 +170,20 @@ export class UsersService {
         message: `Erro ao remover foto: ${error}`,
       };
     }
+  }
+
+  async searchUsers(term: string): Promise<User[]> {
+    const users = await this.servicesService.listAllUsers();
+
+    const filteredUsers = users.filter(
+      (user) =>
+        user.email.toLowerCase().includes(term.toLowerCase()) ||
+        (user.cpf && user.cpf.includes(term)) ||
+        (user.phone && user.phone.includes(term)) ||
+        user.name.toLowerCase().includes(term.toLowerCase()) ||
+        user.lastName.toLowerCase().includes(term.toLowerCase()),
+    );
+
+    return filteredUsers;
   }
 }

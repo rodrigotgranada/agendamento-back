@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import * as admin from 'firebase-admin';
-import { User, CreateUserDto } from '@/types/users';
 import { FirebaseAdmin } from './firebase.config';
 import { Firestore, FirestoreUserData } from './firebase.interface';
+import { CreateUserDto, User, UserRole, UserStatus } from '@/types/users';
 
 @Injectable()
 export class FirebaseService {
@@ -25,8 +25,8 @@ export class FirebaseService {
       createdBy: userData.createdBy || '',
       phone: userData.phone || '',
       photoUrl: userData.photoUrl || '',
-      role: userData.role || 'user',
-      status: userData.status || 'active',
+      role: userData.role || UserRole.USER,
+      status: userData.status || UserStatus.ACTIVE,
       updatedBy: userData.updatedBy || '',
     };
 
