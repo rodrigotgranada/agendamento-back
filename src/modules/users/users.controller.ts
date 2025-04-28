@@ -10,6 +10,7 @@ import {
   UseInterceptors,
   UploadedFile,
   Delete,
+  Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from './users.service';
@@ -32,13 +33,25 @@ export class UsersController {
   async registerUser(
     @Body() userData: CreateUserDto,
     @UploadedFile() file?: MulterFile,
-  ): Promise<User> {
+  ): Promise<{
+    statusCode: number;
+    success: boolean;
+    message: string;
+    error: null;
+    data: User;
+  }> {
     return this.usersService.createUser(userData, file);
   }
 
   @Get()
   async listAllUsers(): Promise<User[]> {
     return this.usersService.listAllUsers();
+  }
+
+  @Get('search')
+  async searchUsers(@Query('term') term: string): Promise<User[]> {
+    console.log('CONTROLLER - SEARCH USERS - TERM:', term);
+    return this.usersService.searchUsers(term);
   }
 
   @Get(':id')

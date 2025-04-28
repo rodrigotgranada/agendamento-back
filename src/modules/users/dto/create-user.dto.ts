@@ -6,6 +6,7 @@ import {
   IsEnum,
   Matches,
 } from 'class-validator';
+import { UserRole, UserStatus } from '@/types/users';
 
 export class CreateUserDto {
   @IsEmail({}, { message: 'Email inválido' })
@@ -37,13 +38,11 @@ export class CreateUserDto {
   @IsString()
   photoUrl?: string | null;
 
+  @IsEnum(UserRole)
   @IsOptional()
-  @IsString()
-  @IsEnum(['user', 'admin'], { message: 'Role inválida' })
-  role?: string;
+  role?: UserRole;
 
+  @IsEnum(UserStatus)
   @IsOptional()
-  @IsString()
-  @IsEnum(['active', 'inactive'], { message: 'Status inválido' })
-  status?: 'active' | 'inactive';
+  status?: UserStatus;
 }
